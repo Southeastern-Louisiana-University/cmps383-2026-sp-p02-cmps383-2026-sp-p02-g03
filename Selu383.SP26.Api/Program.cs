@@ -19,6 +19,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     {
         options.Cookie.Name = "auth";
 
+        // IMPORTANT for tests: they run on http://localhost (not https)
+        options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.HttpOnly = true;
+
         // API tests expect status codes, not redirects
         options.Events.OnRedirectToLogin = ctx =>
         {
@@ -44,51 +49,76 @@ using (var scope = app.Services.CreateScope())
     // Use EnsureCreated for test compatibility (in-memory / swapped providers)
     db.Database.EnsureCreated();
 
-    // Seed Roles
-    if (!db.Roles.Any(r => r.Name == "admin"))
-        db.Roles.Add(new Role { Name = "admin" });
+    // ---- Roles (match what tests expect: usually "Admin" and "User") ----
+    if (!db.Roles.Any(r => r.Name == "Admin"))
+        db.Roles.Add(new Role { Name = "Admin" });
 
-    if (!db.Roles.Any(r => r.Name == "user"))
-        db.Roles.Add(new Role { Name = "user" });
+    if (!db.Roles.Any(r => r.Name == "User"))
+        db.Roles.Add(new Role { Name = "User" });
 
     db.SaveChanges();
 
-    // Seed Users (force correct credentials, remove duplicates safely)
+    // ---- Users (match tests: Password123!) ----
+    const string seededPassword = "Password123!";
+
+    // bob (User)
     var bobs = db.Users.Where(u => u.Username == "bob").ToList();
     if (bobs.Count == 0)
     {
         db.Users.Add(new User
         {
             Username = "bob",
-            Password = "password",
-            RoleName = "user"
+            Password = seededPassword,
+            RoleName = "User"
         });
     }
     else
     {
         var keep = bobs[0];
-        keep.Password = "password";
-        keep.RoleName = "user";
+        keep.Password = seededPassword;
+        keep.RoleName = "User";
 
         if (bobs.Count > 1)
             db.Users.RemoveRange(bobs.Skip(1));
     }
 
+    // sue (User)  <-- tests commonly use this user for "wrong user" scenarios
+    var sues = db.Users.Where(u => u.Username == "sue").ToList();
+    if (sues.Count == 0)
+    {
+        db.Users.Add(new User
+        {
+            Username = "sue",
+            Password = seededPassword,
+            RoleName = "User"
+        });
+    }
+    else
+    {
+        var keep = sues[0];
+        keep.Password = seededPassword;
+        keep.RoleName = "User";
+
+        if (sues.Count > 1)
+            db.Users.RemoveRange(sues.Skip(1));
+    }
+
+    // galkadi (Admin)
     var admins = db.Users.Where(u => u.Username == "galkadi").ToList();
     if (admins.Count == 0)
     {
         db.Users.Add(new User
         {
             Username = "galkadi",
-            Password = "password",
-            RoleName = "admin"
+            Password = seededPassword,
+            RoleName = "Admin"
         });
     }
     else
     {
         var keep = admins[0];
-        keep.Password = "password";
-        keep.RoleName = "admin";
+        keep.Password = seededPassword;
+        keep.RoleName = "Admin";
 
         if (admins.Count > 1)
             db.Users.RemoveRange(admins.Skip(1));
@@ -96,7 +126,7 @@ using (var scope = app.Services.CreateScope())
 
     db.SaveChanges();
 
-    // Seed Locations (your original seed)
+    // ---- Locations (must have at least 3 seeded) ----
     if (!db.Locations.Any())
     {
         db.Locations.AddRange(

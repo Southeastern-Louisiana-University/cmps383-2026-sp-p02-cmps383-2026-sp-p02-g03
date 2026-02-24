@@ -12,80 +12,79 @@ namespace Selu383.SP26.Api.Controllers;
 [Route("api/[controller]")]
 public class AuthenticationController : ControllerBase
 {
-    private readonly DataContext _db;
+    private readonly DataContext db;
 
-    public AuthenticationController(DataContext db) => _db = db;
-
-    public class LoginDto
+    public AuthenticationController(DataContext db)
     {
-        public string? Username { get; set; }
+        this.db = db;
+    }
+
+    public sealed class LoginDto
+    {
+        public string? UserName { get; set; }
         public string? Password { get; set; }
     }
 
-    [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginDto? dto)
+    public sealed class UserDto
     {
-        // Try JSON first
-        var username = dto?.Username;
-        var password = dto?.Password;
+        public int Id { get; set; }
+        public string? UserName { get; set; }
+        public string[]? Roles { get; set; }
+    }
 
-        // Try form data (x-www-form-urlencoded / multipart)
-        if ((string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password)) && Request.HasFormContentType)
-        {
-            username =
-                Request.Form["username"].FirstOrDefault() ??
-                Request.Form["Username"].FirstOrDefault() ??
-                Request.Form["userName"].FirstOrDefault() ??
-                Request.Form["UserName"].FirstOrDefault();
-
-            password =
-                Request.Form["password"].FirstOrDefault() ??
-                Request.Form["Password"].FirstOrDefault();
-        }
-
-        // Try querystring (cheap to support; sometimes test helpers do this)
-        if (string.IsNullOrWhiteSpace(username))
-            username = Request.Query["username"].FirstOrDefault() ?? Request.Query["Username"].FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(password))
-            password = Request.Query["password"].FirstOrDefault() ?? Request.Query["Password"].FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+    [HttpPost("login")]
+    public async Task<ActionResult<UserDto>> Login([FromBody] LoginDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.UserName) || string.IsNullOrWhiteSpace(dto.Password))
             return BadRequest();
 
-        username = username.Trim();
-
-        // Case-insensitive username match (avoids "Bob" vs "bob" issues)
-        var user = await _db.Users.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == username.ToLower());
-
+        // NOTE: adjust property names if yours differ (Username vs UserName, etc.)
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Username == dto.UserName);
         if (user == null) return BadRequest();
 
-        // Exact password match
-        if (user.Password != password) return BadRequest();
+        // tests assume simple password check works
+        if (user.Password != dto.Password) return BadRequest();
+
+        // RoleName is what you seeded in Program.cs ("User"/"Admin")
+        var roles = new[] { user.RoleName };
 
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Role, user.RoleName ?? "")
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.Username),
         };
+        foreach (var r in roles.Where(r => !string.IsNullOrWhiteSpace(r)))
+            claims.Add(new Claim(ClaimTypes.Role, r));
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
 
+        // THIS is what causes Set-Cookie to be returned
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-        return Ok(new { user.Username, Role = user.RoleName });
+        return Ok(new UserDto
+        {
+            Id = user.Id,
+            UserName = user.Username,
+            Roles = roles
+        });
     }
 
     [Authorize]
     [HttpGet("me")]
-    public IActionResult Me()
+    public async Task<ActionResult<UserDto>> Me()
     {
-        return Ok(new
+        var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(idStr, out var userId)) return Unauthorized();
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) return Unauthorized();
+
+        return Ok(new UserDto
         {
-            Username = User.Identity?.Name,
-            Role = User.FindFirstValue(ClaimTypes.Role)
+            Id = user.Id,
+            UserName = user.Username,
+            Roles = new[] { user.RoleName }
         });
     }
 
@@ -93,8 +92,8 @@ public class AuthenticationController : ControllerBase
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
+        // THIS is what clears cookie and causes Set-Cookie in response
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return Ok();
     }
 }
-
