@@ -80,6 +80,6 @@ public class UsersController : ControllerBase
         bool hasDigit = password.Any(char.IsDigit);
         bool hasSymbol = password.Any(ch => !char.IsLetterOrDigit(ch));
 
-        return hasUpper && hasLower && hasDigit && hasSymbol;
+         return hasUpper && hasLower && hasDigit && hasSymbol;
     }
-}
+}   
