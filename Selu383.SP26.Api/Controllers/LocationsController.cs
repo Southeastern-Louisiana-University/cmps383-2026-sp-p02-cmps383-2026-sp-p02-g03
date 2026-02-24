@@ -40,7 +40,7 @@ public class LocationsController(DataContext dataContext) : ControllerBase
     }
 
     // ✅ Admin only
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public ActionResult<LocationDto> Create(LocationDto dto)
     {
@@ -62,7 +62,7 @@ public class LocationsController(DataContext dataContext) : ControllerBase
     }
 
     // ✅ Admin only
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
     public ActionResult<LocationDto> Update(int id, LocationDto dto)
     {
@@ -82,7 +82,7 @@ public class LocationsController(DataContext dataContext) : ControllerBase
     }
 
     // ✅ Admin only
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
     public ActionResult Delete(int id)
     {
