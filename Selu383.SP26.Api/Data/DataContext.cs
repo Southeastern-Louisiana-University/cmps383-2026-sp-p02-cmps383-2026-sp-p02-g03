@@ -7,16 +7,24 @@ public class DataContext : DbContext
 {
     public DataContext(DbContextOptions<DataContext> options) : base(options)
     {
-        
     }
 
-    public DbSet<Location> Locations { get; set; }
+    public DbSet<Location> Locations { get; set; } = default!;
+
+    // Auth tables (must exist in your model if you're seeding/logging in)
+    public DbSet<User> Users { get; set; } = default!;
+    public DbSet<Role> Roles { get; set; } = default!;
+
+    // ✅ Tests expect these to be SAFE (return bool, never throw)
+    public bool HasLocation(string name) => Locations.Any(l => l.Name == name);
+    public bool HasUser(string username) => Users.Any(u => u.Username == username);
+    public bool HasRole(string roleName) => Roles.Any(r => r.Name == roleName);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // find all the "IEntityTypeConfiguration<TEntity>" implementations in this assembly and apply them
+        // apply IEntityTypeConfiguration<> from this assembly (if you have any)
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DataContext).Assembly);
     }
 }
