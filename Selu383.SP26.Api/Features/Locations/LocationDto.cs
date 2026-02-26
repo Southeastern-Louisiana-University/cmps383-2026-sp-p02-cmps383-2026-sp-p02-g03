@@ -1,17 +1,12 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace Selu383.SP26.Api.Features.Locations;
 
 public class LocationDto
 {
     public int Id { get; set; }
-
-    [Required]
-    [MaxLength(120)]
-    public string Name { get; set; } = string.Empty;
-
-    [Required]
-    public string Address { get; set; } = string.Empty;
-
+    public string? Name { get; set; }
+    public string? Address { get; set; }
     public int TableCount { get; set; }
+
+    // Tests send an int (e.g., 46). Must be int?
+    public int? ManagerId { get; set; }
 }
